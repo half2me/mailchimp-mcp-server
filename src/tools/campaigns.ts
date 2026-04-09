@@ -255,6 +255,10 @@ export function registerCampaignTools(server: McpServer): void {
         reply_to: z.string().email().describe("Reply-to email address"),
         preview_text: z.string().optional().describe("Preview text shown in email clients"),
         type: CampaignTypeEnum.default("regular").describe("Campaign type (default: regular)"),
+        segment_opts: z.object({
+          match: z.enum(["any", "all"]).describe("How to combine conditions: 'any' (OR) or 'all' (AND)"),
+          conditions: z.array(z.record(z.unknown())).describe("Array of Mailchimp segment condition objects (passed through as-is). Example for a tag: {condition_type: 'StaticSegment', field: 'static_segment', op: 'static_is', value: 12345}"),
+        }).optional().describe("Inline segment conditions to filter recipients (e.g. send to a specific tag or segment). The value in a StaticSegment condition is the numeric segment ID from GET /lists/{id}/segments."),
       }).strict(),
       annotations: {
         readOnlyHint: false,
@@ -265,9 +269,14 @@ export function registerCampaignTools(server: McpServer): void {
     },
     async (params) => {
       try {
+        const recipients: Record<string, unknown> = { list_id: params.list_id };
+        if (params.segment_opts) {
+          recipients.segment_opts = params.segment_opts;
+        }
+
         const body = {
           type: params.type,
-          recipients: { list_id: params.list_id },
+          recipients,
           settings: {
             subject_line: params.subject_line,
             title: params.title,
