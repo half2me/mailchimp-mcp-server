@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:mailchimp.com)",
+      "WebFetch(domain:api.mailchimp.com)"
+    ]
+  }
+}

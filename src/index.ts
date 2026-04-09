@@ -25,6 +25,10 @@ import { registerLandingPageTools } from "./tools/landing-pages.js";
 import { registerWebhookTools } from "./tools/webhooks.js";
 import { registerFileManagerTools } from "./tools/file-manager.js";
 import { registerBatchTools } from "./tools/batch.js";
+import { registerCustomerJourneyTools } from "./tools/customer-journeys.js";
+import { registerVerifiedDomainTools } from "./tools/verified-domains.js";
+import { registerCampaignFeedbackTools } from "./tools/campaign-feedback.js";
+import { registerActivityFeedTools } from "./tools/activity-feed.js";
 
 // Create MCP server
 const server = new McpServer({
@@ -46,6 +50,10 @@ registerLandingPageTools(server);
 registerWebhookTools(server);
 registerFileManagerTools(server);
 registerBatchTools(server);
+registerCustomerJourneyTools(server);
+registerVerifiedDomainTools(server);
+registerCampaignFeedbackTools(server);
+registerActivityFeedTools(server);
 
 // Start server with stdio transport
 async function main() {

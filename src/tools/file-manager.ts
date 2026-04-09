@@ -129,6 +129,144 @@ export function registerFileManagerTools(server: McpServer): void {
       }
     }
   );
+  // ── Get File ──────────────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_get_file",
+    {
+      title: "Get File Details",
+      description: "Get detailed information about a specific file in the file manager.",
+      inputSchema: z.object({
+        file_id: z.number().int().min(1).describe("The file ID"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const data = await mailchimpRequest<any>(`/file-manager/files/${params.file_id}`);
+        const lines = [
+          `# File: ${data.name}`,
+          ``,
+          `- **ID**: \`${data.id}\``,
+          `- **Type**: ${data.type || "N/A"}`,
+          `- **Size**: ${data.size ? formatBytes(data.size) : "N/A"}`,
+          `- **URL**: ${data.full_url || "N/A"}`,
+          `- **Width**: ${data.width || "N/A"}`,
+          `- **Height**: ${data.height || "N/A"}`,
+          `- **Folder ID**: ${data.folder_id || "None"}`,
+          `- **Created**: ${data.created_at ? new Date(data.created_at).toLocaleString() : "N/A"}`,
+        ];
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Delete File ─────────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_delete_file",
+    {
+      title: "Delete File",
+      description: "Permanently delete a file from the file manager. This cannot be undone.",
+      inputSchema: z.object({
+        file_id: z.number().int().min(1).describe("The file ID to delete"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(`/file-manager/files/${params.file_id}`, "DELETE");
+        return { content: [{ type: "text", text: `File \`${params.file_id}\` deleted.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── List Folders ────────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_list_file_folders",
+    {
+      title: "List File Manager Folders",
+      description: "List all folders in the file manager.",
+      inputSchema: PaginationSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const data = await mailchimpRequest<any>("/file-manager/folders", "GET", undefined, {
+          count: params.count,
+          offset: params.offset,
+        });
+        const folders = data.folders ?? [];
+        const total = data.total_items ?? 0;
+
+        if (!folders.length) {
+          return { content: [{ type: "text", text: "No folders found in file manager." }] };
+        }
+
+        const lines: string[] = [`# File Manager Folders`, ``, `Found ${total} folder(s).`, ``];
+        for (const f of folders) {
+          lines.push(`- **${f.name}** — ID: \`${f.id}\` — files: ${f.file_count ?? 0} — created: ${f.created_at ?? "N/A"}`);
+        }
+
+        const meta = paginationMeta(total, folders.length, params.offset);
+        if (meta.has_more) {
+          lines.push(``, `*Showing ${folders.length} of ${total}. Use offset=${meta.next_offset} to see more.*`);
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Create Folder ───────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_create_file_folder",
+    {
+      title: "Create File Manager Folder",
+      description: "Create a new folder in the file manager to organize files.",
+      inputSchema: z.object({
+        name: z.string().min(1).describe("Folder name"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const data = await mailchimpRequest<any>("/file-manager/folders", "POST", { name: params.name });
+        return {
+          content: [{
+            type: "text",
+            text: `Folder created!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\``,
+          }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
 }
 
 function formatBytes(bytes: number): string {

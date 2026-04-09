@@ -71,6 +71,162 @@ export function registerLandingPageTools(server: McpServer): void {
     }
   );
 
+  // ── Create Landing Page ───────────────────────────────────────
+  server.registerTool(
+    "mailchimp_create_landing_page",
+    {
+      title: "Create Landing Page",
+      description: "Create a new landing page in Mailchimp.",
+      inputSchema: z.object({
+        name: z.string().min(1).describe("Name for the landing page"),
+        title: z.string().optional().describe("Page title shown in the browser tab"),
+        description: z.string().optional().describe("Description of the page"),
+        list_id: z.string().optional().describe("Audience/list ID to connect signups to"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const body: Record<string, unknown> = { name: params.name };
+        if (params.title !== undefined) body.title = params.title;
+        if (params.description !== undefined) body.description = params.description;
+        if (params.list_id !== undefined) body.list_id = params.list_id;
+
+        const data = await mailchimpRequest<any>("/landing-pages", "POST", body);
+        return {
+          content: [{
+            type: "text",
+            text: `Landing page created!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\`\n- **Status**: ${data.status}`,
+          }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Update Landing Page ──────────────────────────────────────
+  server.registerTool(
+    "mailchimp_update_landing_page",
+    {
+      title: "Update Landing Page",
+      description: "Update an existing landing page's name, title, or description.",
+      inputSchema: z.object({
+        page_id: z.string().min(1).describe("The landing page ID"),
+        name: z.string().optional().describe("Updated page name"),
+        title: z.string().optional().describe("Updated page title"),
+        description: z.string().optional().describe("Updated description"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (params.name !== undefined) body.name = params.name;
+        if (params.title !== undefined) body.title = params.title;
+        if (params.description !== undefined) body.description = params.description;
+
+        const data = await mailchimpRequest<any>(`/landing-pages/${params.page_id}`, "PATCH", body);
+        return {
+          content: [{
+            type: "text",
+            text: `Landing page updated!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\``,
+          }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Delete Landing Page ──────────────────────────────────────
+  server.registerTool(
+    "mailchimp_delete_landing_page",
+    {
+      title: "Delete Landing Page",
+      description: "Permanently delete a landing page. This cannot be undone.",
+      inputSchema: z.object({
+        page_id: z.string().min(1).describe("The landing page ID to delete"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(`/landing-pages/${params.page_id}`, "DELETE");
+        return { content: [{ type: "text", text: `Landing page \`${params.page_id}\` deleted.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Publish Landing Page ─────────────────────────────────────
+  server.registerTool(
+    "mailchimp_publish_landing_page",
+    {
+      title: "Publish Landing Page",
+      description: "Publish a landing page, making it live and accessible via its URL.",
+      inputSchema: z.object({
+        page_id: z.string().min(1).describe("The landing page ID to publish"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(`/landing-pages/${params.page_id}/actions/publish`, "POST");
+        return { content: [{ type: "text", text: `Landing page \`${params.page_id}\` published.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Unpublish Landing Page ───────────────────────────────────
+  server.registerTool(
+    "mailchimp_unpublish_landing_page",
+    {
+      title: "Unpublish Landing Page",
+      description: "Unpublish a landing page, taking it offline.",
+      inputSchema: z.object({
+        page_id: z.string().min(1).describe("The landing page ID to unpublish"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(`/landing-pages/${params.page_id}/actions/unpublish`, "POST");
+        return { content: [{ type: "text", text: `Landing page \`${params.page_id}\` unpublished.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
   // ── Get Landing Page ──────────────────────────────────────────
   server.registerTool(
     "mailchimp_get_landing_page",

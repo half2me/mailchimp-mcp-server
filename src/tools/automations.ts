@@ -197,4 +197,142 @@ export function registerAutomationTools(server: McpServer): void {
       }
     }
   );
+
+  // ── Start Automation Email ──────────────────────────────────────
+  server.registerTool(
+    "mailchimp_start_automation_email",
+    {
+      title: "Start Individual Automation Email",
+      description: "Start a specific email within a classic automation workflow.",
+      inputSchema: z.object({
+        workflow_id: z.string().min(1).describe("The automation workflow ID"),
+        email_id: z.string().min(1).describe("The automation email ID to start"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(
+          `/automations/${params.workflow_id}/emails/${params.email_id}/actions/start`,
+          "POST"
+        );
+        return { content: [{ type: "text", text: `Automation email \`${params.email_id}\` started.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Pause Automation Email ──────────────────────────────────────
+  server.registerTool(
+    "mailchimp_pause_automation_email",
+    {
+      title: "Pause Individual Automation Email",
+      description: "Pause a specific email within a classic automation workflow.",
+      inputSchema: z.object({
+        workflow_id: z.string().min(1).describe("The automation workflow ID"),
+        email_id: z.string().min(1).describe("The automation email ID to pause"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(
+          `/automations/${params.workflow_id}/emails/${params.email_id}/actions/pause`,
+          "POST"
+        );
+        return { content: [{ type: "text", text: `Automation email \`${params.email_id}\` paused.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── List Automation Email Queue ─────────────────────────────────
+  server.registerTool(
+    "mailchimp_list_automation_queue",
+    {
+      title: "List Automation Email Queue",
+      description: "List subscribers in the queue for a specific automation email.",
+      inputSchema: z.object({
+        workflow_id: z.string().min(1).describe("The automation workflow ID"),
+        email_id: z.string().min(1).describe("The automation email ID"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const data = await mailchimpRequest<any>(
+          `/automations/${params.workflow_id}/emails/${params.email_id}/queue`
+        );
+        const queue = data.queue ?? [];
+
+        if (!queue.length) {
+          return { content: [{ type: "text", text: "No subscribers in the queue for this automation email." }] };
+        }
+
+        const lines: string[] = [`# Automation Email Queue`, ``, `${queue.length} subscriber(s) queued.`, ``];
+        for (const item of queue) {
+          lines.push(`- **${item.email_address}** — next send: ${item.next_send ?? "N/A"}`);
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Remove Subscriber from Automation ───────────────────────────
+  server.registerTool(
+    "mailchimp_remove_automation_subscriber",
+    {
+      title: "Remove Subscriber from Automation",
+      description:
+        "Remove a subscriber from a classic automation workflow. " +
+        "The subscriber will no longer receive emails from this automation.",
+      inputSchema: z.object({
+        workflow_id: z.string().min(1).describe("The automation workflow ID"),
+        email_address: z.string().email().describe("The subscriber's email address to remove"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        await mailchimpRequest(
+          `/automations/${params.workflow_id}/removed-subscribers`,
+          "POST",
+          { email_address: params.email_address }
+        );
+        return {
+          content: [{
+            type: "text",
+            text: `Subscriber \`${params.email_address}\` removed from automation \`${params.workflow_id}\`.`,
+          }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
 }

@@ -312,6 +312,157 @@ export function registerEcommerceTools(server: McpServer): void {
     }
   );
 
+  // ── List Store Customers ───────────────────────────────────────
+  server.registerTool(
+    "mailchimp_list_store_customers",
+    {
+      title: "List Store Customers",
+      description: "List all customers in an ecommerce store.",
+      inputSchema: PaginationSchema.extend({
+        store_id: z.string().min(1).describe("The store ID"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const data = await mailchimpRequest<any>(
+          `/ecommerce/stores/${params.store_id}/customers`,
+          "GET",
+          undefined,
+          { count: params.count, offset: params.offset }
+        );
+        const customers = data.customers ?? [];
+        const total = data.total_items ?? 0;
+
+        if (!customers.length) {
+          return { content: [{ type: "text", text: `No customers found in store \`${params.store_id}\`.` }] };
+        }
+
+        const lines: string[] = [`# Store Customers: \`${params.store_id}\``, ``, `Found ${total} customer(s).`, ``];
+        for (const c of customers) {
+          lines.push(`- **${c.email_address || "(unknown)"}** — ID: \`${c.id}\` — orders: ${c.orders_count ?? 0} — total spent: $${c.total_spent ?? 0}`);
+        }
+
+        const meta = paginationMeta(total, customers.length, params.offset);
+        if (meta.has_more) {
+          lines.push(``, `*Showing ${customers.length} of ${total}. Use offset=${meta.next_offset} to see more.*`);
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Get Store Order ────────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_get_store_order",
+    {
+      title: "Get Store Order Details",
+      description: "Get detailed information about a specific order including line items.",
+      inputSchema: z.object({
+        store_id: z.string().min(1).describe("The store ID"),
+        order_id: z.string().min(1).describe("The order ID"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const o = await mailchimpRequest<any>(
+          `/ecommerce/stores/${params.store_id}/orders/${params.order_id}`
+        );
+
+        const lines = [
+          `# Order: ${o.id}`,
+          ``,
+          `- **Customer**: ${o.customer?.email_address || "N/A"}`,
+          `- **Total**: $${o.order_total ?? 0}`,
+          `- **Discount**: $${o.discount_total ?? 0}`,
+          `- **Tax**: $${o.tax_total ?? 0}`,
+          `- **Shipping**: $${o.shipping_total ?? 0}`,
+          `- **Status**: ${o.fulfillment_status || "N/A"}`,
+          `- **Financial Status**: ${o.financial_status || "N/A"}`,
+          `- **Order Date**: ${o.processed_at ? new Date(o.processed_at).toLocaleString() : "N/A"}`,
+          `- **Campaign ID**: ${o.campaign_id || "N/A"}`,
+          ``,
+        ];
+
+        const items = o.lines ?? [];
+        if (items.length) {
+          lines.push(`### Line Items (${items.length})`, ``);
+          for (const item of items) {
+            lines.push(`- **${item.product_title || item.id}** — qty: ${item.quantity} — $${item.price ?? 0}`);
+          }
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Get Store Product ──────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_get_store_product",
+    {
+      title: "Get Store Product Details",
+      description: "Get detailed information about a specific product including variants.",
+      inputSchema: z.object({
+        store_id: z.string().min(1).describe("The store ID"),
+        product_id: z.string().min(1).describe("The product ID"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const p = await mailchimpRequest<any>(
+          `/ecommerce/stores/${params.store_id}/products/${params.product_id}`
+        );
+
+        const lines = [
+          `# Product: ${p.title || "(untitled)"}`,
+          ``,
+          `- **ID**: \`${p.id}\``,
+          `- **URL**: ${p.url || "N/A"}`,
+          `- **Description**: ${p.description || "N/A"}`,
+          `- **Vendor**: ${p.vendor || "N/A"}`,
+          `- **Type**: ${p.type || "N/A"}`,
+          `- **Published**: ${p.published_at_foreign ? new Date(p.published_at_foreign).toLocaleString() : "N/A"}`,
+          ``,
+        ];
+
+        const variants = p.variants ?? [];
+        if (variants.length) {
+          lines.push(`### Variants (${variants.length})`, ``);
+          for (const v of variants) {
+            lines.push(`- **${v.title || v.id}** — SKU: ${v.sku || "N/A"} — $${v.price ?? 0} — inventory: ${v.inventory_quantity ?? "N/A"}`);
+          }
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
   // ── List Store Promo Codes ────────────────────────────────────
   server.registerTool(
     "mailchimp_list_store_promo_codes",
@@ -360,11 +511,10 @@ export function registerEcommerceTools(server: McpServer): void {
         for (const code of codes) {
           lines.push(`## ${code.code}`);
           lines.push(`- **ID**: \`${code.id}\``);
-          lines.push(`- **Discount**: ${code.discount_type === "percent" ? `${code.discount_value}%` : `$${code.discount_value}`}`);
+          lines.push(`- **Redemption URL**: ${code.redemption_url || "N/A"}`);
           lines.push(`- **Usage Count**: ${code.usage_count ?? 0}`);
-          lines.push(`- **Max Uses**: ${code.max_uses !== null ? code.max_uses : "Unlimited"}`);
           lines.push(`- **Enabled**: ${code.enabled ? "Yes" : "No"}`);
-          lines.push(`- **Created**: ${code.created_at ? new Date(code.created_at).toLocaleString() : "N/A"}`);
+          lines.push(`- **Created**: ${code.created_at_foreign ? new Date(code.created_at_foreign).toLocaleString() : "N/A"}`);
           lines.push(``);
         }
 

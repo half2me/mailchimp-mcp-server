@@ -62,7 +62,7 @@ export function registerTemplateTools(server: McpServer): void {
     "mailchimp_get_template",
     {
       title: "Get Mailchimp Template",
-      description: "Get details and HTML content of a specific email template.",
+      description: "Get metadata for a specific email template. Use mailchimp_get_template_content to get the HTML.",
       inputSchema: z.object({
         template_id: z.number().int().min(1).describe("The template ID"),
       }).strict(),
@@ -130,6 +130,90 @@ export function registerTemplateTools(server: McpServer): void {
               text: `Template created!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\`\n\nUse this ID with mailchimp_set_campaign_content.`,
             },
           ],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Get Template Default Content ─────────────────────────────────
+  server.registerTool(
+    "mailchimp_get_template_content",
+    {
+      title: "Get Template Default Content",
+      description:
+        "Get the raw HTML content of a template. Returns the default content " +
+        "sections and full HTML that you can customize and use with mailchimp_set_campaign_content.",
+      inputSchema: z.object({
+        template_id: z.number().int().min(1).describe("The template ID"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const data = await mailchimpRequest<any>(`/templates/${params.template_id}/default-content`);
+        const sections = data.sections ?? {};
+
+        const lines = [`# Template Content for ID \`${params.template_id}\``, ``];
+
+        if (Object.keys(sections).length) {
+          lines.push(`## Editable Sections`, ``);
+          for (const [key, val] of Object.entries(sections)) {
+            const preview = String(val).length > 200 ? String(val).slice(0, 200) + "..." : String(val);
+            lines.push(`### ${key}`, `\`\`\`html`, preview, `\`\`\``, ``);
+          }
+        }
+
+        if (data.html) {
+          const htmlPreview = data.html.length > 8000
+            ? data.html.slice(0, 8000) + "\n... [truncated]"
+            : data.html;
+          lines.push(`## Full HTML`, ``, `\`\`\`html`, htmlPreview, `\`\`\``);
+        }
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Update Template ─────────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_update_template",
+    {
+      title: "Update Mailchimp Template",
+      description: "Update an existing template's name or HTML content.",
+      inputSchema: z.object({
+        template_id: z.number().int().min(1).describe("The template ID to update"),
+        name: z.string().optional().describe("Updated template name"),
+        html: z.string().optional().describe("Updated full HTML content"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (params.name) body.name = params.name;
+        if (params.html) body.html = params.html;
+
+        const data = await mailchimpRequest<any>(`/templates/${params.template_id}`, "PATCH", body);
+        return {
+          content: [{
+            type: "text",
+            text: `Template updated!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\``,
+          }],
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { mailchimpRequest, handleApiError } from "../services/mailchimp-client.js";
-import { PaginationSchema, paginationMeta } from "../schemas/common.js";
+
 
 const WebhookEventEnum = z.enum([
   "subscribe",
@@ -97,10 +97,21 @@ export function registerWebhookTools(server: McpServer): void {
     },
     async (params) => {
       try {
+        // Mailchimp expects events and sources as objects with boolean properties,
+        // not arrays. Convert arrays to the required format.
+        const eventsObj: Record<string, boolean> = {};
+        for (const event of params.events) {
+          eventsObj[event] = true;
+        }
+        const sourcesObj: Record<string, boolean> = {};
+        for (const source of params.sources) {
+          sourcesObj[source] = true;
+        }
+
         const body = {
           url: params.url,
-          events: params.events,
-          sources: params.sources,
+          events: eventsObj,
+          sources: sourcesObj,
         };
 
         const data = await mailchimpRequest<any>(
@@ -122,6 +133,60 @@ export function registerWebhookTools(server: McpServer): void {
                 `- **Status**: ${data.enabled ? "Enabled" : "Disabled"}`,
             },
           ],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Update Webhook ────────────────────────────────────────────
+  server.registerTool(
+    "mailchimp_update_webhook",
+    {
+      title: "Update Webhook",
+      description:
+        "Update an existing webhook's URL, events, or sources.",
+      inputSchema: z.object({
+        list_id: z.string().min(1).describe("The audience/list ID"),
+        webhook_id: z.string().min(1).describe("The webhook ID to update"),
+        url: z.string().url().optional().describe("Updated webhook URL"),
+        events: z.array(WebhookEventEnum).optional().describe("Updated events list"),
+        sources: z.array(WebhookSourceEnum).optional().describe("Updated sources list"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (params) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (params.url !== undefined) body.url = params.url;
+        if (params.events !== undefined) {
+          const eventsObj: Record<string, boolean> = {};
+          for (const event of params.events) eventsObj[event] = true;
+          body.events = eventsObj;
+        }
+        if (params.sources !== undefined) {
+          const sourcesObj: Record<string, boolean> = {};
+          for (const source of params.sources) sourcesObj[source] = true;
+          body.sources = sourcesObj;
+        }
+
+        const data = await mailchimpRequest<any>(
+          `/lists/${params.list_id}/webhooks/${params.webhook_id}`,
+          "PATCH",
+          body
+        );
+
+        return {
+          content: [{
+            type: "text",
+            text: `Webhook updated!\n\n- **ID**: \`${data.id}\`\n- **URL**: ${data.url}`,
+          }],
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

@@ -201,15 +201,15 @@ export function registerAudienceTools(server: McpServer): void {
     async (params) => {
       try {
         const body: any = {};
-        if (params.name) body.name = params.name;
-        if (params.permission_reminder) body.permission_reminder = params.permission_reminder;
+        if (params.name !== undefined) body.name = params.name;
+        if (params.permission_reminder !== undefined) body.permission_reminder = params.permission_reminder;
         if (params.email_type_option !== undefined) body.email_type_option = params.email_type_option;
-        if (params.from_name || params.from_email || params.subject || params.language) {
+        if (params.from_name !== undefined || params.from_email !== undefined || params.subject !== undefined || params.language !== undefined) {
           body.campaign_defaults = {};
-          if (params.from_name) body.campaign_defaults.from_name = params.from_name;
-          if (params.from_email) body.campaign_defaults.from_email = params.from_email;
-          if (params.subject) body.campaign_defaults.subject = params.subject;
-          if (params.language) body.campaign_defaults.language = params.language;
+          if (params.from_name !== undefined) body.campaign_defaults.from_name = params.from_name;
+          if (params.from_email !== undefined) body.campaign_defaults.from_email = params.from_email;
+          if (params.subject !== undefined) body.campaign_defaults.subject = params.subject;
+          if (params.language !== undefined) body.campaign_defaults.language = params.language;
         }
 
         const data = await mailchimpRequest<any>(`/lists/${params.list_id}`, "PATCH", body);
