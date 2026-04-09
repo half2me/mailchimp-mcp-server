@@ -1,6 +1,7 @@
 src/
+dist/
+node_modules/
 *.ts
-!*.d.ts
 tsconfig.json
 .git/
 .github/
@@ -10,3 +11,5 @@ coverage/
 CLAUDE.md
 README.md
 .claude/
+package.json
+pnpm-lock.yaml
