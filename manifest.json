@@ -1,6 +1,6 @@
 {
   "manifest_version": "0.3",
-  "name": "mailchimp-mcp-server",
+  "name": "@half2me/mailchimp-mcp-server",
   "display_name": "Mailchimp",
   "version": "1.0.0",
   "description": "MCP server for Mailchimp Marketing API with 100+ tools for managing audiences, campaigns, subscribers, templates, automations, and more.",
