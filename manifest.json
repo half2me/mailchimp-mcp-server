@@ -1,0 +1,43 @@
+{
+  "manifest_version": "0.3",
+  "name": "mailchimp-mcp-server",
+  "display_name": "Mailchimp",
+  "version": "1.0.0",
+  "description": "MCP server for Mailchimp Marketing API with 100+ tools for managing audiences, campaigns, subscribers, templates, automations, and more.",
+  "author": {
+    "name": "Benjamin Tamasi"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/half2me/mailchimp-mcp-server.git"
+  },
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "MAILCHIMP_API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "keywords": ["mailchimp", "email", "marketing", "campaigns", "subscribers", "api"],
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Mailchimp API Key",
+      "description": "Your Mailchimp API key (format: hash-datacenter, e.g. abc123-us21). Find it at mailchimp.com > Account & Billing > Extras > API keys.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=22.0.0"
+    }
+  }
+}

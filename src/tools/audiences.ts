@@ -27,7 +27,7 @@ export function registerAudienceTools(server: McpServer): void {
           count: params.count,
           offset: params.offset,
           fields:
-            "lists.id,lists.name,lists.stats.member_count,lists.stats.unsubscribe_count,lists.stats.open_rate,lists.stats.click_rate,lists.date_created,total_items",
+            "lists.id,lists.web_id,lists.name,lists.stats.member_count,lists.stats.unsubscribe_count,lists.stats.open_rate,lists.stats.click_rate,lists.date_created,total_items",
         });
 
         const lists = data.lists ?? [];
@@ -42,6 +42,7 @@ export function registerAudienceTools(server: McpServer): void {
           const stats = l.stats ?? {};
           lines.push(`## ${l.name}`);
           lines.push(`- **ID**: \`${l.id}\``);
+          if (l.web_id) lines.push(`- **Web ID**: \`${l.web_id}\``);
           lines.push(`- **Members**: ${stats.member_count ?? "N/A"}`);
           lines.push(`- **Unsubscribed**: ${stats.unsubscribe_count ?? "N/A"}`);
           lines.push(`- **Open rate**: ${stats.open_rate != null ? (stats.open_rate * 100).toFixed(1) + "%" : "N/A"}`);
@@ -89,6 +90,7 @@ export function registerAudienceTools(server: McpServer): void {
           `# Audience: ${data.name}`,
           ``,
           `- **ID**: \`${data.id}\``,
+          `- **Web ID**: \`${data.web_id}\``,
           `- **Members**: ${stats.member_count ?? 0}`,
           `- **Unsubscribed**: ${stats.unsubscribe_count ?? 0}`,
           `- **Cleaned**: ${stats.cleaned_count ?? 0}`,
@@ -163,7 +165,7 @@ export function registerAudienceTools(server: McpServer): void {
           content: [
             {
               type: "text",
-              text: `Audience created successfully!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\`\n\nUse this ID with other Mailchimp tools.`,
+              text: `Audience created successfully!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\`\n- **Web ID**: \`${data.web_id}\`\n\nUse this ID with other Mailchimp tools.`,
             },
           ],
         };

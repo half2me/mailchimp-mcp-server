@@ -52,6 +52,7 @@ export function registerCampaignTools(server: McpServer): void {
           const sendTime = c.send_time ? new Date(c.send_time).toLocaleString() : "Not sent";
           lines.push(`## ${c.settings?.title || "(untitled)"}`);
           lines.push(`- **ID**: \`${c.id}\``);
+          if (c.web_id) lines.push(`- **Web ID**: \`${c.web_id}\``);
           lines.push(`- **Subject**: ${c.settings?.subject_line || "N/A"}`);
           lines.push(`- **Status**: ${c.status}`);
           lines.push(`- **Type**: ${c.type}`);
@@ -104,6 +105,7 @@ export function registerCampaignTools(server: McpServer): void {
           `# Campaign: ${s.title || "(untitled)"}`,
           ``,
           `- **ID**: \`${data.id}\``,
+          `- **Web ID**: \`${data.web_id}\``,
           `- **Subject**: ${s.subject_line || "N/A"}`,
           `- **Preview text**: ${s.preview_text || "N/A"}`,
           `- **From**: ${s.from_name} <${s.reply_to}>`,
@@ -295,6 +297,7 @@ export function registerCampaignTools(server: McpServer): void {
               text:
                 `Campaign created as draft!\n\n` +
                 `- **ID**: \`${data.id}\`\n` +
+                `- **Web ID**: \`${data.web_id}\`\n` +
                 `- **Title**: ${data.settings?.title}\n` +
                 `- **Subject**: ${data.settings?.subject_line}\n` +
                 `- **Status**: ${data.status}\n\n` +
@@ -317,12 +320,17 @@ export function registerCampaignTools(server: McpServer): void {
       title: "Set Mailchimp Campaign Content",
       description:
         "Set the HTML content and optional plain-text content for a campaign. " +
-        "The campaign must be in 'save' (draft) status. You can also reference a template.",
+        "The campaign must be in 'save' (draft) status. You can provide raw HTML, or reference a template " +
+        "and fill its editable sections via template_sections. Use mailchimp_get_template_content to discover section names.",
       inputSchema: z.object({
         campaign_id: z.string().min(1).describe("The campaign ID"),
         html: z.string().optional().describe("Full HTML content for the email"),
         plain_text: z.string().optional().describe("Plain-text version of the email"),
         template_id: z.number().int().optional().describe("Template ID to use instead of raw HTML"),
+        template_sections: z.record(z.string()).optional().describe(
+          "Key-value map of editable section names to HTML content. Use with template_id. " +
+          "Get available section names from mailchimp_get_template_content."
+        ),
       }).strict(),
       annotations: {
         readOnlyHint: false,
@@ -336,7 +344,11 @@ export function registerCampaignTools(server: McpServer): void {
         const body: Record<string, unknown> = {};
         if (params.html) body.html = params.html;
         if (params.plain_text) body.plain_text = params.plain_text;
-        if (params.template_id) body.template = { id: params.template_id };
+        if (params.template_id) {
+          const template: Record<string, unknown> = { id: params.template_id };
+          if (params.template_sections) template.sections = params.template_sections;
+          body.template = template;
+        }
 
         await mailchimpRequest(
           `/campaigns/${params.campaign_id}/content`,

@@ -1,0 +1,12 @@
+src/
+*.ts
+!*.d.ts
+tsconfig.json
+.git/
+.github/
+*.test.*
+coverage/
+.env*
+CLAUDE.md
+README.md
+.claude/

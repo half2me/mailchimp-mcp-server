@@ -81,6 +81,7 @@ export function registerTemplateTools(server: McpServer): void {
           `# Template: ${data.name}`,
           ``,
           `- **ID**: \`${data.id}\``,
+          `- **Web ID**: \`${data.web_id}\``,
           `- **Type**: ${data.type}`,
           `- **Created**: ${data.date_created ?? "N/A"}`,
           `- **Edited**: ${data.date_edited ?? "N/A"}`,
@@ -127,7 +128,7 @@ export function registerTemplateTools(server: McpServer): void {
           content: [
             {
               type: "text",
-              text: `Template created!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\`\n\nUse this ID with mailchimp_set_campaign_content.`,
+              text: `Template created!\n\n- **Name**: ${data.name}\n- **ID**: \`${data.id}\`\n- **Web ID**: \`${data.web_id}\`\n\nUse this ID with mailchimp_set_campaign_content.`,
             },
           ],
         };
