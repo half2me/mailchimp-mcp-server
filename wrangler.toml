@@ -2,3 +2,6 @@ name = "mailchimp-mcp-server"
 main = "dist/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+
+[vars]
+MAILCHIMP_CLIENT_ID = "979346119817"

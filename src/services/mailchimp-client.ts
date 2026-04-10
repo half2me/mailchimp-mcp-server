@@ -12,7 +12,8 @@ export const apiKeyStore = new AsyncLocalStorage<string>();
  * API keys have the format: `<hash>-<dc>` (e.g., `abc123def456-us21`).
  */
 function getDataCenter(apiKey: string): string {
-  const parts = apiKey.split("-");
+  const key = apiKey.startsWith("oauth:") ? apiKey.slice(6) : apiKey;
+  const parts = key.split("-");
   const dc = parts[parts.length - 1];
   if (!dc || !/^[a-z]+\d+$/.test(dc)) {
     throw new Error(
@@ -50,6 +51,14 @@ export async function mailchimpRequest<T>(
   const apiKey = getApiKey();
   const dc = getDataCenter(apiKey);
 
+  // Derive auth header: OAuth tokens are passed as "oauth:<token>-<dc>",
+  // standard API keys use Basic auth.
+  const isOAuth = apiKey.startsWith("oauth:");
+  const token = isOAuth ? apiKey.slice(6, apiKey.lastIndexOf("-")) : apiKey;
+  const authHeader = isOAuth
+    ? `Bearer ${token}`
+    : `Basic ${btoa("anystring:" + apiKey)}`;
+
   const url = new URL(`https://${dc}.api.mailchimp.com/3.0${endpoint}`);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -66,7 +75,7 @@ export async function mailchimpRequest<T>(
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "Authorization": `Basic ${btoa("anystring:" + apiKey)}`,
+        "Authorization": authHeader,
       },
       body: data ? JSON.stringify(data) : undefined,
       signal: controller.signal,
