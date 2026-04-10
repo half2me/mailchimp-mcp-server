@@ -1,4 +1,3 @@
-import axios, { AxiosError } from "axios";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { REQUEST_TIMEOUT } from "../constants.js";
 
@@ -40,6 +39,7 @@ function getApiKey(): string {
 
 /**
  * Make an authenticated request to the Mailchimp Marketing API.
+ * Uses native fetch — works in Node.js, Cloudflare Workers, Deno, etc.
  */
 export async function mailchimpRequest<T>(
   endpoint: string,
@@ -50,56 +50,86 @@ export async function mailchimpRequest<T>(
   const apiKey = getApiKey();
   const dc = getDataCenter(apiKey);
 
-  const response = await axios.request<T>({
-    url: `https://${dc}.api.mailchimp.com/3.0${endpoint}`,
-    method,
-    data,
-    params,
-    timeout: REQUEST_TIMEOUT,
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    auth: {
-      username: "anystring",
-      password: apiKey,
-    },
-  });
-  return response.data;
+  const url = new URL(`https://${dc}.api.mailchimp.com/3.0${endpoint}`);
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    }
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": `Basic ${btoa("anystring:" + apiKey)}`,
+      },
+      body: data ? JSON.stringify(data) : undefined,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const err = new MailchimpApiError(
+        response.status,
+        (body.title as string) ?? "API Error",
+        (body.detail as string) ?? "",
+      );
+      throw err;
+    }
+
+    return await response.json() as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+class MailchimpApiError extends Error {
+  constructor(
+    public status: number,
+    public title: string,
+    public detail: string,
+  ) {
+    super(`${status}: ${title}. ${detail}`);
+    this.name = "MailchimpApiError";
+  }
 }
 
 /**
- * Format an Axios/Mailchimp API error into a helpful, actionable message.
+ * Format an API error into a helpful, actionable message.
  */
 export function handleApiError(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const axiosErr = error as AxiosError<{ title?: string; detail?: string; status?: number }>;
-    if (axiosErr.response) {
-      const { status, data } = axiosErr.response;
-      const title = data?.title ?? "API Error";
-      const detail = data?.detail ?? "";
-
-      switch (status) {
-        case 400:
-          return `Error (400 Bad Request): ${title}. ${detail}. Check your parameters and try again.`;
-        case 401:
-          return `Error (401 Unauthorized): ${title}. ${detail}. Your API key may be invalid or expired. Regenerate it at https://us1.admin.mailchimp.com/account/api/`;
-        case 403:
-          return `Error (403 Forbidden): ${title}. ${detail}. You don't have permission for this action.`;
-        case 404:
-          return `Error (404 Not Found): ${title}. ${detail}. Check that the resource ID is correct.`;
-        case 405:
-          return `Error (405 Method Not Allowed): ${title}. ${detail}.`;
-        case 429:
-          return `Error (429 Rate Limited): Too many requests. Wait a moment and try again.`;
-        default:
-          return `Error (${status}): ${title}. ${detail}`;
-      }
-    } else if (axiosErr.code === "ECONNABORTED") {
-      return "Error: Request timed out. The Mailchimp API may be slow — try again.";
-    } else if (axiosErr.code === "ENOTFOUND") {
-      return "Error: Could not connect to Mailchimp API. Check your network and that your API key data center suffix is correct.";
+  if (error instanceof MailchimpApiError) {
+    const { status, title, detail } = error;
+    switch (status) {
+      case 400:
+        return `Error (400 Bad Request): ${title}. ${detail}. Check your parameters and try again.`;
+      case 401:
+        return `Error (401 Unauthorized): ${title}. ${detail}. Your API key may be invalid or expired. Regenerate it at https://us1.admin.mailchimp.com/account/api/`;
+      case 403:
+        return `Error (403 Forbidden): ${title}. ${detail}. You don't have permission for this action.`;
+      case 404:
+        return `Error (404 Not Found): ${title}. ${detail}. Check that the resource ID is correct.`;
+      case 405:
+        return `Error (405 Method Not Allowed): ${title}. ${detail}.`;
+      case 429:
+        return `Error (429 Rate Limited): Too many requests. Wait a moment and try again.`;
+      default:
+        return `Error (${status}): ${title}. ${detail}`;
     }
   }
+
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Error: Request timed out. The Mailchimp API may be slow — try again.";
+  }
+
+  if (error instanceof TypeError && (error.message.includes("fetch") || error.message.includes("network"))) {
+    return "Error: Could not connect to Mailchimp API. Check your network and that your API key data center suffix is correct.";
+  }
+
   return `Error: ${error instanceof Error ? error.message : String(error)}`;
 }

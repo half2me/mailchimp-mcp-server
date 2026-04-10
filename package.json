@@ -12,7 +12,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "bundle": "esbuild dist/index.js --bundle --platform=node --format=cjs --outfile=bundle/index.cjs",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy"
   },
   "packageManager": "pnpm@10.32.1",
   "engines": {
@@ -20,13 +22,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
-    "axios": "^1.7.9",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "esbuild": "^0.28.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "wrangler": "^4.81.1"
   }
 }

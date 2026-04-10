@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer as createHttpServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createServer } from "./index.js";
+import { createServer } from "./server.js";
 import { apiKeyStore } from "./services/mailchimp-client.js";
 
 const transports = new Map<string, StreamableHTTPServerTransport>();
