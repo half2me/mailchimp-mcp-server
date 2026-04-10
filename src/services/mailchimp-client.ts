@@ -1,7 +1,12 @@
-import axios, { AxiosError, AxiosInstance } from "axios";
+import axios, { AxiosError } from "axios";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { REQUEST_TIMEOUT } from "../constants.js";
 
-let clientInstance: AxiosInstance | null = null;
+/**
+ * AsyncLocalStorage lets tool handlers inherit the API key from the
+ * HTTP request that triggered them — no changes needed in tool files.
+ */
+export const apiKeyStore = new AsyncLocalStorage<string>();
 
 /**
  * Extract the data center from a Mailchimp API key.
@@ -13,43 +18,24 @@ function getDataCenter(apiKey: string): string {
   if (!dc || !/^[a-z]+\d+$/.test(dc)) {
     throw new Error(
       `Invalid Mailchimp API key format. Expected format: <key>-<dc> (e.g., abc123-us21). ` +
-      `Got suffix: "${dc}". Check your MAILCHIMP_API_KEY environment variable.`
+      `Got suffix: "${dc}".`
     );
   }
   return dc;
 }
 
 /**
- * Get or create the shared Axios client for Mailchimp API requests.
+ * Resolve the API key: AsyncLocalStorage (HTTP mode) → env var (stdio mode).
  */
-export function getClient(): AxiosInstance {
-  if (clientInstance) return clientInstance;
-
-  const apiKey = process.env.MAILCHIMP_API_KEY;
-  if (!apiKey) {
+function getApiKey(): string {
+  const key = apiKeyStore.getStore() ?? process.env.MAILCHIMP_API_KEY;
+  if (!key) {
     throw new Error(
-      "MAILCHIMP_API_KEY environment variable is required. " +
-      "Generate one at: https://us1.admin.mailchimp.com/account/api/ " +
-      "(replace 'us1' with your data center)."
+      "MAILCHIMP_API_KEY is not set. " +
+      "Generate one at: https://us1.admin.mailchimp.com/account/api/"
     );
   }
-
-  const dc = getDataCenter(apiKey);
-
-  clientInstance = axios.create({
-    baseURL: `https://${dc}.api.mailchimp.com/3.0`,
-    timeout: REQUEST_TIMEOUT,
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    auth: {
-      username: "anystring",
-      password: apiKey,
-    },
-  });
-
-  return clientInstance;
+  return key;
 }
 
 /**
@@ -61,12 +47,23 @@ export async function mailchimpRequest<T>(
   data?: unknown,
   params?: Record<string, unknown>
 ): Promise<T> {
-  const client = getClient();
-  const response = await client.request<T>({
-    url: endpoint,
+  const apiKey = getApiKey();
+  const dc = getDataCenter(apiKey);
+
+  const response = await axios.request<T>({
+    url: `https://${dc}.api.mailchimp.com/3.0${endpoint}`,
     method,
     data,
     params,
+    timeout: REQUEST_TIMEOUT,
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    auth: {
+      username: "anystring",
+      password: apiKey,
+    },
   });
   return response.data;
 }

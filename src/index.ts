@@ -4,8 +4,9 @@
  * An MCP server providing tools to interact with the Mailchimp Marketing API v3.
  * Supports audience management, subscriber operations, campaigns, templates, and reporting.
  *
- * Authentication: Set the MAILCHIMP_API_KEY environment variable.
- * Transport: stdio (for local integrations like Claude Cowork / Claude Code).
+ * Transports:
+ *   - stdio (default): for Claude Desktop / Code. Requires MAILCHIMP_API_KEY env var.
+ *   - HTTP  (--http) : for Claude Cowork / remote. API key via X-Mailchimp-API-Key header.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -29,47 +30,56 @@ import { registerVerifiedDomainTools } from "./tools/verified-domains.js";
 import { registerCampaignFeedbackTools } from "./tools/campaign-feedback.js";
 import { registerActivityFeedTools } from "./tools/activity-feed.js";
 
-// Create MCP server
-const server = new McpServer({
-  name: "mailchimp-mcp-server",
-  version: "1.0.0",
-});
+/** Create a fully-configured McpServer with all tools registered. */
+export function createServer(): McpServer {
+  const server = new McpServer({
+    name: "mailchimp-mcp-server",
+    version: "1.0.0",
+  });
 
-// Register all tool groups
-registerAccountTools(server);
-registerAudienceTools(server);
-registerSubscriberTools(server);
-registerCampaignTools(server);
-registerTemplateTools(server);
-registerReportTools(server);
-registerAutomationTools(server);
-registerSegmentTools(server);
-registerEcommerceTools(server);
-registerLandingPageTools(server);
-registerWebhookTools(server);
-registerFileManagerTools(server);
-registerBatchTools(server);
-registerCustomerJourneyTools(server);
-registerVerifiedDomainTools(server);
-registerCampaignFeedbackTools(server);
-registerActivityFeedTools(server);
+  registerAccountTools(server);
+  registerAudienceTools(server);
+  registerSubscriberTools(server);
+  registerCampaignTools(server);
+  registerTemplateTools(server);
+  registerReportTools(server);
+  registerAutomationTools(server);
+  registerSegmentTools(server);
+  registerEcommerceTools(server);
+  registerLandingPageTools(server);
+  registerWebhookTools(server);
+  registerFileManagerTools(server);
+  registerBatchTools(server);
+  registerCustomerJourneyTools(server);
+  registerVerifiedDomainTools(server);
+  registerCampaignFeedbackTools(server);
+  registerActivityFeedTools(server);
 
-// Start server with stdio transport
+  return server;
+}
+
 async function main() {
-  if (!process.env.MAILCHIMP_API_KEY) {
-    console.error(
-      "ERROR: MAILCHIMP_API_KEY environment variable is required.\n" +
-        "To get your API key:\n" +
-        "  1. Log in to Mailchimp → Account & billing → Extras → API keys\n" +
-        "  2. Click 'Create A Key' and copy the full key (including the -usXX suffix)\n" +
-        "  3. Set it: export MAILCHIMP_API_KEY='your-key-here'\n"
-    );
-    process.exit(1);
-  }
+  if (process.argv.includes("--http")) {
+    const { startHttpServer } = await import("./http.js");
+    const port = parseInt(process.env.PORT ?? "3000", 10);
+    startHttpServer(port);
+  } else {
+    if (!process.env.MAILCHIMP_API_KEY) {
+      console.error(
+        "ERROR: MAILCHIMP_API_KEY environment variable is required.\n" +
+          "To get your API key:\n" +
+          "  1. Log in to Mailchimp → Account & billing → Extras → API keys\n" +
+          "  2. Click 'Create A Key' and copy the full key (including the -usXX suffix)\n" +
+          "  3. Set it: export MAILCHIMP_API_KEY='your-key-here'\n"
+      );
+      process.exit(1);
+    }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Mailchimp MCP server running via stdio");
+    const server = createServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Mailchimp MCP server running via stdio");
+  }
 }
 
 main().catch((error) => {
