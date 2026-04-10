@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Mailchimp MCP Server
  *

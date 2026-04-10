@@ -14,10 +14,10 @@
   "license": "MIT",
   "server": {
     "type": "node",
-    "entry_point": "bundle/index.js",
+    "entry_point": "bundle/index.cjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/bundle/index.js"],
+      "args": ["${__dirname}/bundle/index.cjs"],
       "env": {
         "MAILCHIMP_API_KEY": "${user_config.api_key}"
       }
